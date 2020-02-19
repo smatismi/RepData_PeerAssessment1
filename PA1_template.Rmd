@@ -7,19 +7,129 @@ output:
 
 
 ## Loading and preprocessing the data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+```
 
+```{r}
+#load libraries
+library(ggplot2)
+library(plyr)
+library(dplyr)
+
+#load data from CSV file
+activity_data <- read.csv('C:/Users/smatismi/OneDrive - Capgemini/Documents/R/win-library/3.5/rmarkdown/activity.csv')
+
+str(activity_data)
+```
+
+```{r} 
+
+steps_day <- tapply(activity_data$steps, activity_data$date, sum, na.rm=TRUE)
+steps_day <- steps_day[!is.na(steps_day)]
+
+str(steps_day)
+
+```
+
+```{r}
+hist(x=steps_day, col="green", breaks = 20, main= "Steps Per Day", xlab = "Total steps", ylab ="Frequency")
+#cleansteps_day <-steps_day[!is.na(steps_day$steps,)]
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r}
+mean_st <- mean(steps_day)
+mean_st
+```
 
+```{r}
+med_st <-median(steps_day)
+med_st
+```
 
 ## What is the average daily activity pattern?
+```{r}
+#cleansteps_day <-steps_day[!is.na(steps_day$steps),]
+#intervalTb <- steps_day[ ,c (lapply(.SD, mean, na.rm=TRUE)), .SDcols =c("steps"), by =.(interval)]
+#intervalTb <- ddply(steps_day, .(interval), summarize, Ave = mean(steps))
+interval <- activity_data %>%
+  filter(!is.na(steps)) %>%
+  group_by(interval) %>%
+  summarize(Avg_steps = mean(steps))
+  
+ggplot(interval, aes(x=interval , y=Avg_steps)) + geom_line(color='green', size=1) + labs(title ="Average Steps per Day", x ="interval", y = "average steps per day" )
+```
 
+#Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+#interval[steps == max(steps), .(max_interval <- interval)]
+max_steps <- max(interval$Avg_steps)
+interval[interval$Avg_steps == max_steps, ]
+```
 
 
 ## Imputing missing values
 
+##imputing missing values, calculate the total number of missing values
+```{r}
+nrow(activity_data[is.na(activity_data$steps),])
+```
 
+#Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+#substute missing values with the mean
+```{r}
+activity_data_fill <- activity_data
+nmv <- is.na(activity_data_fill$steps)
+step_ave <- tapply(activity_data_fill$steps, activity_data_fill$interval, mean, na.rm=TRUE)
+activity_data_fill$steps[nmv] <- step_ave[as.character(activity_data_fill$interval[nmv])]
+
+new_activity <- tapply(activity_data_fill$steps, activity_data_fill$date, sum, na.rm = TRUE)
+hist(x=new_activity, col="green", breaks=20, xlab="Daily Steps", ylab="Frequency", main="Steps per Day missing values filled with mean")
+```
+
+```{r}
+mean_fill <- mean(new_activity)
+mean_fill
+```
+
+```{r}
+median_fill <- median(new_activity)
+median_fill
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+##Are there differences in activity patterns between weekdays and weekends?
+```{r}
+#is_wk_day <- function(d) {
+ # wd <-weekdays(d)
+#  ifelse (wd == "Saturday" | wd == "Sunday", #"weekend" , "weekday")
+#}
+
+#we <- sapply(activity_data_fill$date, is_wk_day)
+#activity_data$wk <-  as.factor(we)
+#head(activity_data_fill)
+activity_data_fill$realdate <- as.Date(activity_data_fill$date, format = "%Y-%m-%d")
+activity_data_fill$weekday <- weekdays(activity_data_fill$realdate)
+activity_data_fill$weekorend <- ifelse(activity_data_fill$weekday =="Saturday" | activity_data_fill$weekday =="Sunday", 'weekend', 'weekday' )
+head(activity_data_fill)
+```
+
+```{r}
+steptable <- aggregate(steps~interval+weekorend, data=activity_data_fill, FUN = mean)
+head(steptable)
+
+```
+
+```{r}
+steptable$time <- steptable$interval/100
+head(steptable)
+J<-ggplot(steptable, aes(time, steps))
+J+geom_line(col="green") + ggtitle("Average Steps per 5 Minute Interval, Weekday verses Weekend") +xlab("time")+ylab("steps")+facet_wrap(~weekorend, ncol= 1, nrow =2)
+```
